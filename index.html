@@ -70,9 +70,7 @@
         margin-top: 40px;
         background: linear-gradient(to right, #077a7d 50%, #06202b 50%);
         border: 1px solid #ccc;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        overflow: hidden;
       }
 
       .normal-line {
@@ -81,6 +79,7 @@
         height: 2px;
         background: gray;
         top: 50%;
+        transform: translateY(-50%);
       }
       .p-line {
         width: 2px;
@@ -88,18 +87,21 @@
         position: absolute;
         left: 50%;
         background-color: black;
+        transform: translateX(-50%);
       }
       #arcCanvas {
-        position: relative;
-        top: 0px;
+        position: absolute;
+        top: 0;
         left: 0;
         width: 100%;
+        height: 100%;
         pointer-events: none;
       }
       svg {
         position: absolute;
-        left: 23%;
-        width: 50%;
+        top: 0;
+        left: 0;
+        width: 100%;
         height: 100%;
         pointer-events: none;
       }
@@ -148,7 +150,7 @@
       <button id="simulator" onclick="simulate()">Simulate</button>
 
       <div class="laser-container" id="laserScene">
-        <canvas id="arcCanvas" width="700" height="300"></canvas>
+        <canvas id="arcCanvas"></canvas>
         <div class="normal-line"></div>
         <div class="p-line"></div>
         <svg id="laserSVG">
@@ -197,18 +199,18 @@
         const speed2 = c / n2;
         const newWavelength = speed2 / frequency;
 
-        const interfaceX = 160;
-        const interfaceY = 150;
-        const sourceX = 60;
-        const dxIncident = interfaceX - sourceX;
+        const canvas = document.getElementById("arcCanvas");
+        const containerHeight = canvas.parentElement.clientHeight;
+        const interfaceX = canvas.parentElement.clientWidth / 2;
+        const interfaceY = containerHeight / 2;
+        const sourceX = interfaceX - 100;
         const angleIn = (angleInDeg * Math.PI) / 180;
-        const dyIncident = -dxIncident * Math.tan(angleIn);
+        const dyIncident = -100 * Math.tan(angleIn);
         const startY = interfaceY + dyIncident;
 
         let points = "";
 
         if (n1 === n2) {
-          // No deviation
           const straightLength = 120;
           const dx = straightLength * Math.cos(angleIn);
           const dy = straightLength * Math.sin(angleIn);
@@ -241,19 +243,19 @@
           const sinOut = (n1 * Math.sin(angleIn)) / n2;
 
           if (Math.abs(sinOut) > 1) {
-            // Total internal reflection
             const reflLength = 120;
             const dxRefl = reflLength * Math.cos(angleIn);
             const dyRefl = reflLength * Math.sin(angleIn);
 
-            const reflEndX = interfaceX - dxRefl; // Reflect across vertical
-            const reflEndY = interfaceY + dyRefl; // Y direction same as incoming (down if positive)
+            const reflEndX = interfaceX - dxRefl;
+            const reflEndY = interfaceY + dyRefl;
 
             points = `${sourceX},${startY} ${interfaceX},${interfaceY} ${reflEndX},${reflEndY}`;
 
-            document.getElementById(
-              "output"
-            ).innerHTML = `<h3>Results:</h3><p><strong>Total Internal Reflection!</strong></p>`;
+            document.getElementById("output").innerHTML = `
+              <h3>Results:</h3>
+              <p><strong>Total Internal Reflection!</strong></p>
+            `;
           } else {
             const angleOut = Math.asin(sinOut);
             const angleOutDeg = (angleOut * 180) / Math.PI;
@@ -270,7 +272,7 @@
             const speedDrop = ((speed1 - speed2) / speed1) * 100;
 
             document.getElementById("output").innerHTML = `
-             
+              <h3>Results:</h3>
               <p><strong>Original Wavelength:</strong> ${(
                 wavelength * 1e9
               ).toFixed(1)} nm</p>
