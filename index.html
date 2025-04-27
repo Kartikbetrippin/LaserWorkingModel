@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Laser Through Mediums Virtual Lab</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: left;
+        background-color: black;
+        margin: 0;
+        padding: 20px;
+        overflow-x: hidden;
+      }
+      h1 {
+        font-size: 4rem;
+        color: cyan;
+      }
+      .container {
+        max-width: 700px;
+        margin: auto;
+        background: black;
+        padding: 20px;
+        border-radius: 12px;
+        color: white;
+      }
+      select,
+      button,
+      input {
+        padding: 10px 20px;
+        margin: 5px 0px 30px 0px;
+        font-size: 1em;
+        background-color: white;
+        color: black;
+        border-radius: 10px;
+        display: block;
+      }
+      #medium1 {
+        background-color: #077a7d;
+        color: white;
+      }
+      #medium2 {
+        background-color: #06202b;
+        color: white;
+      }
+      #simulator {
+        display: inline;
+        width: 100%;
+        background-color: blue;
+        border: 0px;
+        color: white;
+        font-size: 1.5rem;
+      }
+      .output {
+        margin: 100px 0px;
+        text-align: left;
+        border: 3px solid white;
+        padding: 0px 30px;
+      }
+      .output > h1 {
+        margin: 20px;
+      }
+      .laser-container {
+        position: relative;
+        height: 300px;
+        margin-top: 40px;
+        background: linear-gradient(to right, #077a7d 50%, #06202b 50%);
+        border: 1px solid #ccc;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .normal-line {
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background: gray;
+        top: 50%;
+      }
+      .p-line {
+        width: 2px;
+        height: 100%;
+        position: absolute;
+        left: 50%;
+        background-color: black;
+      }
+      #arcCanvas {
+        position: relative;
+        top: 0px;
+        left: 0;
+        width: 100%;
+        pointer-events: none;
+      }
+      svg {
+        position: absolute;
+        left: 23%;
+        width: 50%;
+        height: 100%;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Laser Through Mediums Virtual Lab</h1>
+
+      <label for="color">Choose Laser Color:</label>
+      <select id="color">
+        <option value="red">Red (~650 nm)</option>
+        <option value="green">Green (~532 nm)</option>
+        <option value="blue">Blue (~450 nm)</option>
+      </select>
+
+      <label for="medium1">Medium 1:</label>
+      <select id="medium1">
+        <option value="1">Air (n = 1.00)</option>
+        <option value="1.33">Water (n = 1.33)</option>
+        <option value="1.5">Glass (n = 1.50)</option>
+        <option value="1.47">Olive Oil (n = 1.47)</option>
+        <option value="1.49">Acrylic (n = 1.49)</option>
+        <option value="2.42">Diamond (n = 2.42)</option>
+      </select>
+
+      <label for="medium2">Medium 2:</label>
+      <select id="medium2">
+        <option value="1">Air (n = 1.00)</option>
+        <option value="1.33">Water (n = 1.33)</option>
+        <option value="1.5">Glass (n = 1.50)</option>
+        <option value="1.47">Olive Oil (n = 1.47)</option>
+        <option value="1.49">Acrylic (n = 1.49)</option>
+        <option value="2.42">Diamond (n = 2.42)</option>
+      </select>
+
+      <label for="angleIn">Angle of Incidence (°):</label>
+      <input type="number" id="angleIn" value="30" min="0" max="90" />
+
+      <button id="simulator" onclick="simulate()">Simulate</button>
+
+      <div class="laser-container" id="laserScene">
+        <canvas id="arcCanvas" width="700" height="300"></canvas>
+        <div class="normal-line"></div>
+        <div class="p-line"></div>
+        <svg id="laserSVG">
+          <polyline
+            id="laserPath"
+            fill="none"
+            stroke="red"
+            stroke-width="4"
+            stroke-linecap="round"
+          />
+        </svg>
+      </div>
+
+      <div class="output" id="output"></div>
+
+      <canvas id="speedChart" width="600" height="300"></canvas>
+    </div>
+
+    <script>
+      const c = 3e8; // Speed of light in vacuum
+
+      const lasers = {
+        red: { wavelength: 650e-9, color: "red" },
+        green: { wavelength: 532e-9, color: "green" },
+        blue: { wavelength: 450e-9, color: "blue" },
+      };
+
+      let chartInstance = null;
+
+      function simulate() {
+        const laserType = document.getElementById("color").value;
+        const n1 = parseFloat(document.getElementById("medium1").value);
+        const n2 = parseFloat(document.getElementById("medium2").value);
+        const angleInDeg = parseFloat(document.getElementById("angleIn").value);
+        const laser = lasers[laserType];
+
+        const wavelength = laser.wavelength;
+        const frequency = c / wavelength;
+        const speed1 = c / n1;
+        const speed2 = c / n2;
+        const newWavelength = speed2 / frequency;
+
+        const interfaceX = 160;
+        const interfaceY = 150;
+        const sourceX = 60;
+        const dxIncident = interfaceX - sourceX;
+        const angleIn = (angleInDeg * Math.PI) / 180;
+        const dyIncident = -dxIncident * Math.tan(angleIn);
+        const startY = interfaceY + dyIncident;
+
+        let points = "";
+
+        if (n1 === n2) {
+          // No deviation
+          const straightLength = 120;
+          const dx = straightLength * Math.cos(angleIn);
+          const dy = straightLength * Math.sin(angleIn);
+          const endX = interfaceX + dx;
+          const endY = interfaceY + dy;
+
+          points = `${sourceX},${startY} ${interfaceX},${interfaceY} ${endX},${endY}`;
+
+          document.getElementById("output").innerHTML = `
+            <h3>Results:</h3>
+            <p><strong>Original Wavelength:</strong> ${(
+              wavelength * 1e9
+            ).toFixed(1)} nm</p>
+            <p><strong>Original Frequency:</strong> ${(
+              frequency / 1e12
+            ).toFixed(2)} THz</p>
+            <p><strong>Speed in Medium 1 and 2:</strong> ${(
+              speed1 / 1e8
+            ).toFixed(2)} x10⁸ m/s</p>
+            <p><strong>Wavelength remains same:</strong> ${(
+              wavelength * 1e9
+            ).toFixed(1)} nm</p>
+            <p><strong>No Speed Change</strong></p>
+            <p><strong>No Deviation:</strong> 0°</p>
+            <p><strong>Angle of Refraction:</strong> ${angleInDeg.toFixed(
+              2
+            )}°</p>
+          `;
+        } else {
+          const sinOut = (n1 * Math.sin(angleIn)) / n2;
+
+          if (Math.abs(sinOut) > 1) {
+            // Total internal reflection
+            const reflLength = 120;
+            const dxRefl = reflLength * Math.cos(angleIn);
+            const dyRefl = reflLength * Math.sin(angleIn);
+
+            const reflEndX = interfaceX - dxRefl; // Reflect across vertical
+            const reflEndY = interfaceY + dyRefl; // Y direction same as incoming (down if positive)
+
+            points = `${sourceX},${startY} ${interfaceX},${interfaceY} ${reflEndX},${reflEndY}`;
+
+            document.getElementById(
+              "output"
+            ).innerHTML = `<h3>Results:</h3><p><strong>Total Internal Reflection!</strong></p>`;
+          } else {
+            const angleOut = Math.asin(sinOut);
+            const angleOutDeg = (angleOut * 180) / Math.PI;
+
+            const refractedLength = 120;
+            const dxRefracted = refractedLength * Math.cos(angleOut);
+            const dyRefracted = refractedLength * Math.sin(angleOut);
+
+            const refractedEndX = interfaceX + dxRefracted;
+            const refractedEndY = interfaceY + dyRefracted;
+
+            points = `${sourceX},${startY} ${interfaceX},${interfaceY} ${refractedEndX},${refractedEndY}`;
+
+            const speedDrop = ((speed1 - speed2) / speed1) * 100;
+
+            document.getElementById("output").innerHTML = `
+              <h3>Results:</h3>
+              <p><strong>Original Wavelength:</strong> ${(
+                wavelength * 1e9
+              ).toFixed(1)} nm</p>
+              <p><strong>Original Frequency:</strong> ${(
+                frequency / 1e12
+              ).toFixed(2)} THz</p>
+              <p><strong>Speed in Medium 1:</strong> ${(speed1 / 1e8).toFixed(
+                2
+              )} x10⁸ m/s</p>
+              <p><strong>Speed in Medium 2:</strong> ${(speed2 / 1e8).toFixed(
+                2
+              )} x10⁸ m/s</p>
+              <p><strong>Wavelength in Medium 2:</strong> ${(
+                newWavelength * 1e9
+              ).toFixed(1)} nm</p>
+              <p><strong>Speed Reduction:</strong> ${speedDrop.toFixed(2)}%</p>
+              <p><strong>Angle of Deviation:</strong> ${(
+                angleInDeg - angleOutDeg
+              ).toFixed(2)}°</p>
+              <p><strong>Angle of Refraction:</strong> ${angleOutDeg.toFixed(
+                2
+              )}°</p>
+            `;
+          }
+        }
+
+        const laserPath = document.getElementById("laserPath");
+        laserPath.setAttribute("points", points);
+        laserPath.setAttribute("stroke", laser.color);
+
+        drawGraph(n1, speed1, n2, speed2);
+      }
+
+      function drawGraph(n1, s1, n2, s2) {
+        const ctx = document.getElementById("speedChart").getContext("2d");
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: [`Medium 1 (n=${n1})`, `Medium 2 (n=${n2})`],
+            datasets: [
+              {
+                label: "Speed of Light (x10⁸ m/s)",
+                data: [s1 / 1e8, s2 / 1e8],
+                backgroundColor: ["#EFEEEA", "#273F4F"],
+              },
+            ],
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: "Speed (x10⁸ m/s)",
+                },
+              },
+            },
+          },
+        });
+      }
+    </script>
+  </body>
+</html>
